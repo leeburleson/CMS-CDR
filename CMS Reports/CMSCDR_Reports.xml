@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<reports>
+  <report id="1" name="Largest Meetings by Month" sp="spRpt_GetLargestMeetingsByMonth"
+    description="">
+    <parameters>
+      <parameter p="intYear" name="Year" description="" type="number" />
+    </parameters>
+  </report>
+  <report id="2" name="Largest Meetings of a Month" sp="spRpt_GetLargestMeetingsOfMonth"
+    description="" >
+    <parameters>
+      <parameter p="vcMonth" name="Month" description="" type="month" />
+    </parameters>
+  </report>
+  <report id="3" name="Man Hours Usage Total of Timeperiod" sp="spRpt_GetManHoursUsageOfTimeperiod"
+    description="Provides total usage in manhours of all call legs to all rooms over a timeperiod">
+    <parameters>
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="4" name="Monthly Man Hours Usage of Year" sp="spRpt_GetMonthlyManHoursUsageOfYear"
+    description="">
+    <parameters>
+      <parameter p="intYear" name="Year" description="" type="number" />
+    </parameters>
+  </report>
+  <report id="5" name="Monthly System Usage of Year" sp="spRpt_GetMonthlySystemUsageOfYear"
+    description="">
+    <parameters>
+      <parameter p="intYear" name="Year" description="" type="number" />
+    </parameters>
+  </report>
+  <report id="6" name="Room Usage" sp="spRpt_GetRoomUsage"
+    description="Lists the basic usage of a given room over a timeperiod">
+    <parameters>
+      <parameter p="intRoom" name="Room #" description="CMS room number" type="number" />
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="7" name="Room Man Hours Usage of Timeperiod" sp="spRpt_GetRoomUsageTotalOfTimeperiod"
+    description="Provides total usage in manhours of a room over a timeperiod">
+    <parameters>
+      <parameter p="intRoom" name="Room #" description="CMS room number" type="number" />
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="8" name="Top Connecting Endpoints of Timeperiod" sp="spRpt_GetTopEndPointsOfTimeperiod"
+     description="Lists endpoints that use CMS the most">
+    <parameters>
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="12" name="Busiest Rooms of Timeperiod" sp="spRpt_GetTopRoomsOfTimeperiod"
+   description="Lists rooms that hosted the most meetings over a timeperiod">
+    <parameters>
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="10" name="Meeting Quality Summary" sp="spRpt_GetQoSReport" disabled="true"
+   description="Provides a statistical breakout of meeting quality over a timeperiod">
+    <parameters>
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="9" name="Worst Quality Meetings" sp="spRpt_GetWorstQoSMeetings" disabled="true"
+    description="Lists the meetings that experienced the worst quality of service (QoS) over a timeperiod">
+    <parameters>
+      <parameter p="dtStart" name="Start" description="" type="date" />
+      <parameter p="dtEnd" name="End" description="" type="date" />
+    </parameters>
+  </report>
+  <report id="11" name="Individual Meeting Detail" sp="spRpt_GetMeetingDetail"
+   description="Provides extensive detail on a specific meeting">
+    <parameters>
+      <parameter p="CallID" name="CallID" type="text" description="Enter a GUID" />
+    </parameters>
+  </report>
+  <report id="13" name="Recent Meetings" sp="spRpt_GetRecentMeetings"
+   description="List meetings that have occurred within X days">
+    <parameters>
+      <parameter p="intDays" name="Days" type="number" description="Number of days to include in meeting list" />
+    </parameters>
+  </report>
+</reports>
