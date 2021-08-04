@@ -1056,7 +1056,8 @@ IF @intYear IS NULL set @intYear = DATEPART(year,GETDATE())
 SELECT SUM(intDurationSeconds)/60 as 'Room Minutes', SUM(intDurationSeconds)/60/60 as 'Room Hours', COUNT(CallID) as 'Meeting Count', intYYYYMM as YYYYMM
 FROM tblCallEnd
 WHERE dtTime >= DATEFROMPARTS(@intYear,01,01) AND dtTime < DATEFROMPARTS(@intYear +1,01,01)
-group by intYYYYMM
+GROUP BY intYYYYMM
+ORDER BY intYYYYMM
 
 END
 GO
