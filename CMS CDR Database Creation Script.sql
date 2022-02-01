@@ -817,6 +817,35 @@ PRINT 'spProcessCallStart: Ending'
 END
 
 GO
+/****** Object:  StoredProcedure [dbo].[spRemoveInvalidRawRecords]    Script Date: 01-Feb-22 13:18:51 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[spRemoveInvalidRawRecords]
+
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+-- This section removes records that do not have a callBridge attribute
+-- Discovered 01-Feb-2022 under CMS 3.3.0.6
+DELETE 
+FROM tblRawRecords
+WHERE ID IN (
+	SELECT  [ID]
+	FROM [tblRawRecords]
+	OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
+	WHERE bitProcessed = 0
+	AND Records.col.value('@callBridge','uniqueidentifier') is  null
+)
+
+END
+
+GO
 /****** Object:  StoredProcedure [dbo].[spResetAll]    Script Date: 08-Jul-21 14:42:46 ******/
 SET ANSI_NULLS ON
 GO
@@ -1028,7 +1057,8 @@ IF @intYear IS NULL set @intYear = DATEPART(year,GETDATE())
 SELECT SUM(intDurationSeconds)/60 as 'Man Minutes', SUM(intDurationSeconds)/60/60 as 'Man Hours', COUNT(CallLegId) AS 'Connections', intYYYYMM as 'YYYYMM'
 FROM tblCallLegEnd
 WHERE dtTime >= DATEFROMPARTS(@intYear,01,01) AND dtTime < DATEFROMPARTS(@intYear +1,01,01)
-group by intYYYYMM
+GROUP BY intYYYYMM
+ORDER BY intYYYYMM
 
 END
 GO
