@@ -447,7 +447,7 @@ BEGIN
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessAll]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessAll]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -466,27 +466,39 @@ BEGIN
 	--SET NOCOUNT ON;
 
 	DECLARE @intRetVal int
+	DECLARE @tblProcessed TABLE (intRawRecordID int)
+	
 	PRINT 'Start time:' + CONVERT(varchar, SYSDATETIME(), 121)
-
+	
 	BEGIN TRANSACTION
 
-	EXEC @intRetVal = spProcessCallStart;
+	INSERT INTO @tblProcessed (intRawRecordID)
+		EXEC @intRetVal = spProcessCallStart;
 	IF @intRetVal = -1 GOTO ErrExit
 
-	EXEC @intRetVal = spProcessCallEnd; 
+	INSERT INTO @tblProcessed (intRawRecordID)
+		EXEC @intRetVal = spProcessCallEnd; 
 	IF @intRetVal = -1 GOTO ErrExit
 
-	EXEC @intRetVal = spProcessCallLegStart; 
+	INSERT INTO @tblProcessed (intRawRecordID)
+		EXEC @intRetVal = spProcessCallLegStart; 
 	IF @intRetVal = -1 GOTO ErrExit
 
-	EXEC @intRetVal = spProcessCallLegEnd; 
+	INSERT INTO @tblProcessed (intRawRecordID)
+		EXEC @intRetVal = spProcessCallLegEnd; 
 	IF @intRetVal = -1 GOTO ErrExit
 
-	EXEC @intRetVal = spProcessCallLegUpdate; 
+	INSERT INTO @tblProcessed (intRawRecordID)
+		EXEC @intRetVal = spProcessCallLegUpdate; 
 	IF @intRetVal = -1 GOTO ErrExit
+
+	UPDATE tblRawRecords
+	SET bitProcessed=1, dtProcessed=SYSDATETIME()
+	WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
 
 NormalExit:
 	IF @@TRANCOUNT=1 COMMIT TRANSACTION
+	PRINT CAST(@@ROWCOUNT as varchar(32)) + ' raw records processed.'
 	PRINT 'Normal completion time:' + CONVERT(varchar, SYSDATETIME(), 121)
 	RETURN(0)
 	GOTO FinalExit
@@ -501,7 +513,7 @@ END
 
 
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessCallEnd]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessCallEnd]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -512,6 +524,7 @@ GO
 -- Description:	<Description,,>
 -- =============================================
 CREATE PROCEDURE [dbo].[spProcessCallEnd]
+ 
 
 AS
 BEGIN
@@ -523,12 +536,12 @@ BEGIN
 DECLARE @tblProcessed TABLE (intRawRecordID int)
 
 INSERT tblCallEnd
-OUTPUT INSERTED.intRawRecordID INTO @tblProcessed
+OUTPUT INSERTED.intRawRecordID --INTO @tblProcessed
 SELECT * FROM (
 
 select ID as intRawRecordID, 
-	Records.col.value('@session','uniqueidentifier') as 'Session',
-	Records.col.value('@callBridge','uniqueidentifier') as CallBridge,
+	Record.col.value('../@session','uniqueidentifier') as 'Session',
+	Record.col.value('../@callBridge','uniqueidentifier') as CallBridge,
 	Record.col.value('(@time)[1]','varchar(64)') as dtTime,
 	Record.col.value('(@correlatorIndex)[1]','int') as intCorrelatorIndex,
 	Record.col.value('(call/@id)[1]','uniqueidentifier') as CallID,
@@ -539,7 +552,7 @@ select ID as intRawRecordID,
 from tblRawRecords
 
 OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record') as Record(col)
+OUTER APPLY Records.col.nodes('record') as Record(col)
 
 where not bitProcessed=1
 AND
@@ -548,9 +561,8 @@ Record.col.value('(@type)[1]','varchar(64)') = 'callEnd'
 )
 AS Garbage
 
-UPDATE tblRawRecords
-SET bitProcessed=1, dtProcessed=SYSDATETIME()
-WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
+SELECT intRawRecordID
+FROM @tblProcessed
 
 IF @@ERROR >0 RETURN -1
 
@@ -558,7 +570,7 @@ PRINT 'spProcessCallEnd: Ending'
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessCallLegEnd]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessCallLegEnd]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -579,41 +591,42 @@ INSERT INTO tblCallLegEnd
 OUTPUT INSERTED.intRawRecordID INTO @tblProcessed
 SELECT * FROM (
 
-SELECT ID as intRawRecordID, 
-	Records.col.value('@callBridge','uniqueidentifier') as CallBridge,
-	CallLeg.col.value('(@id)[1]','uniqueidentifier') as CallLegID,
+SELECT 
+	ID as intRawRecordID, 
+	Record.col.value('../@callBridge','uniqueidentifier') as CallBridge,
+	Record.col.value('(callLeg/@id)[1]','uniqueidentifier') as CallLegID,
 	Record.col.value('(@time)[1]','varchar(64)') as dtTime,
 	Record.col.value('(@correlatorIndex)[1]','int') as intCorrelatorIndex,
-    dbo.fGetCallLegEndReasonID(CallLeg.col.value('(reason)[1]','varchar(64)')) as intReason,
-	dbo.fConvertToBit(CallLeg.col.value('(remoteTeardown)[1]','varchar(64)')) as bitRemoteTeardown,
-	CallLeg.col.value('(durationSeconds)[1]','int') as intDurationSeconds,
-	CallLeg.col.value('(activatedDuration)[1]','int') as intActivatedDuration,
-	CallLeg.col.value('(alarm/@type)[1]','varchar(64)') as vcAlarmType,
-	CallLeg.col.value('(alarm/@durationPercentage)[1]','numeric(9,3)') as numAlarmDurationPercentage,
-	dbo.fConvertToBit(CallLeg.col.value('(unencryptedMedia)[1]','varchar(64)')) as bitUnencryptedMedia,
-	RxAudio.col.value('(codec)[1]','varchar(64)') as vcRxAudioCodec,
-	RxAudio.col.value('(packetStatistics/packetLossBursts/duration)[1]','numeric(9, 3)') as numRxAudioPacketLossBurstsDuration,
-	RxAudio.col.value('(packetStatistics/packetLossBursts/density)[1]','numeric(9,3)') as numRxAudioPacketLossBurstsDensity,
-	RxAudio.col.value('(packetStatistics/packetGap/duration)[1]','numeric(9,3)') as numRxAudioPacketGapDuration,
-	RxAudio.col.value('(packetStatistics/packetGap/density)[1]','numeric(9,3)') as numRxAudioPacketGapDensity,
-	CallLeg.col.value('(txAudio/codec)[1]','varchar(64)') as vcTxAudioCodec,
-	CallLeg.col.value('(rxVideo/codec)[1]','varchar(64)') as vcRxVideoCodec,
-	RxVideo.col.value('(packetStatistics/packetLossBursts/duration)[1]','numeric(9,3)') as numRxVideoPacketLossBurstsDuration,
-	RxVideo.col.value('(packetStatistics/packetLossBursts/density)[1]','numeric(9,3)') as numRxVideoPacketLossBurstsDensity,
-	RxVideo.col.value('(packetStatistics/packetGap/duration)[1]','numeric(9,3)') as numRxVideoPacketGapDuration,
-	RxVideo.col.value('(packetStatistics/packetGap/density)[1]','numeric(9,3)') as numRxVideoPacketGapDensity,
-	CallLeg.col.value('(txVideo/codec)[1]','varchar(64)') as vcTxVideoCodec,
-	CallLeg.col.value('(txVideo/maxSizeWidth)[1]','varchar(64)') as intTxVideoMaxSizeWidth,
-	CallLeg.col.value('(txVideo/maxSizeHeight)[1]','varchar(64)') as intTxVideoMaxSizeHeight,
-	CallLeg.col.value('(sipCallId)[1]','varchar(128)') as vcSipCallId
+    dbo.fGetCallLegEndReasonID(Record.col.value('(callLeg/reason)[1]','varchar(64)')) as intReason,
+	dbo.fConvertToBit(Record.col.value('(callLeg/remoteTeardown)[1]','varchar(64)')) as bitRemoteTeardown,
+	Record.col.value('(callLeg/durationSeconds)[1]','int') as intDurationSeconds,
+	Record.col.value('(callLeg/activatedDuration)[1]','int') as intActivatedDuration,
+	Record.col.value('(callLeg/alarm/@type)[1]','varchar(64)') as vcAlarmType,
+	Record.col.value('(callLeg/alarm/@durationPercentage)[1]','numeric(9,3)') as numAlarmDurationPercentage,
+	dbo.fConvertToBit(Record.col.value('(callLeg/unencryptedMedia)[1]','varchar(64)')) as bitUnencryptedMedia,
+	Record.col.value('(callLeg/rxAudio/codec)[1]','varchar(64)') as vcRxAudioCodec,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetLossBursts/duration)[1]','numeric(9, 3)') as numRxAudioPacketLossBurstsDuration,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetLossBursts/density)[1]','numeric(9,3)') as numRxAudioPacketLossBurstsDensity,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetGap/duration)[1]','numeric(9,3)') as numRxAudioPacketGapDuration,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetGap/density)[1]','numeric(9,3)') as numRxAudioPacketGapDensity,
+	Record.col.value('(callLeg/txAudio/codec)[1]','varchar(64)') as vcTxAudioCodec,
+	Record.col.value('(callLeg/rxVideo/codec)[1]','varchar(64)') as vcRxVideoCodec,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetLossBursts/duration)[1]','numeric(9,3)') as numRxVideoPacketLossBurstsDuration,
+	Record.col.value('(callLeg/rxAudio/packetStatistics/packetLossBursts/density)[1]','numeric(9,3)') as numRxVideoPacketLossBurstsDensity,
+	Record.col.value('(callLeg/rxVideo/packetStatistics/packetGap/duration)[1]','numeric(9,3)') as numRxVideoPacketGapDuration,
+	Record.col.value('(callLeg/rxVideo/packetStatistics/packetGap/density)[1]','numeric(9,3)') as numRxVideoPacketGapDensity,
+	Record.col.value('(callLeg/txVideo/codec)[1]','varchar(64)') as vcTxVideoCodec,
+	Record.col.value('(callLeg/txVideo/maxSizeWidth)[1]','varchar(64)') as intTxVideoMaxSizeWidth,
+	Record.col.value('(callLeg/txVideo/maxSizeHeight)[1]','varchar(64)') as intTxVideoMaxSizeHeight,
+	Record.col.value('(callLeg/sipCallId)[1]','varchar(128)') as vcSipCallId
 
 FROM tblRawRecords
 
 OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record') as Record(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg') as CallLeg(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg/rxAudio') as RxAudio(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg/rxVideo') as RxVideo(col)
+OUTER APPLY Records.col.nodes('record') as Record(col)
+--OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg/') as CallLeg(col)
+--OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg/rxAudio') as RxAudio(col)
+--OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg/rxVideo') as RxVideo(col)
 
 WHERE not bitProcessed=1
 AND
@@ -621,10 +634,8 @@ Record.col.value('(@type)[1]','varchar(64)') = 'callLegEnd'
 )
 AS Garbage
 
-UPDATE tblRawRecords
-SET bitProcessed=1, dtProcessed=SYSDATETIME()
-WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
-
+SELECT intRawRecordID
+FROM @tblProcessed
 
 IF @@ERROR >0 RETURN -1
 
@@ -632,7 +643,7 @@ PRINT 'spProcessCallLegEnd: Ending'
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessCallLegStart]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessCallLegStart]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -653,7 +664,7 @@ INSERT INTO tblCallLegStart
 OUTPUT INSERTED.intRawRecordID INTO @tblProcessed
 SELECT * FROM (
 SELECT ID as intRawRecordID,
-	Records.col.value('@callBridge','uniqueidentifier') as CallBridge,
+	Record.col.value('../@callBridge','uniqueidentifier') as CallBridge,
 	CallLeg.col.value('(@id)[1]','uniqueidentifier') as CallLegID,
 	Record.col.value('(@time)[1]','varchar(64)') as dtTime,
 	Record.col.value('(@correlatorIndex)[1]','int') as intCorrelatorIndex,
@@ -679,8 +690,8 @@ SELECT ID as intRawRecordID,
 FROM tblRawRecords
 
 OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record') as Record(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg') as CallLeg(col)
+OUTER APPLY Records.col.nodes('record') as Record(col)
+OUTER APPLY Record.col.nodes('callLeg') as CallLeg(col)
 
 WHERE not bitProcessed=1
 AND
@@ -688,10 +699,8 @@ Record.col.value('(@type)[1]','varchar(64)') = 'callLegStart'
 )
 AS Garbage
 
-PRINT 'spProcessCallLegStart: Updating Raw Records'
-UPDATE tblRawRecords
-SET bitProcessed=1, dtProcessed=SYSDATETIME()
-WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
+SELECT intRawRecordID
+FROM @tblProcessed
 
 IF @@ERROR >0 RETURN -1
 
@@ -699,7 +708,7 @@ PRINT 'spProcessCallLegStart: Ending'
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessCallLegUpdate]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessCallLegUpdate]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -720,7 +729,7 @@ INSERT INTO tblCallLegUpdate
 OUTPUT INSERTED.intRawRecordID INTO @tblProcessed
 SELECT * FROM (
 SELECT ID as intRawRecordID,
-	Records.col.value('@callBridge','uniqueidentifier') as CallBridge,
+	Record.col.value('../@callBridge','uniqueidentifier') as CallBridge,
 	Record.col.value('(@time)[1]','smalldatetime') as dtTime,
 	Record.col.value('(@correlatorIndex)[1]','int') as intCorrelatorIndex,
 	CallLeg.col.value('(@id)[1]','uniqueidentifier') as CallLegID,
@@ -737,8 +746,8 @@ SELECT ID as intRawRecordID,
 FROM tblRawRecords
 
 OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record') as Record(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record/callLeg') as CallLeg(col)
+OUTER APPLY Records.col.nodes('record') as Record(col)
+OUTER APPLY Record.col.nodes('callLeg') as CallLeg(col)
 
 WHERE not bitProcessed=1
 AND
@@ -746,9 +755,8 @@ Record.col.value('(@type)[1]','varchar(64)') = 'callLegUpdate'
 
 ) AS Garbage
 
-UPDATE tblRawRecords
-SET bitProcessed=1, dtProcessed=SYSDATETIME()
-WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
+SELECT intRawRecordID
+FROM @tblProcessed
 
 IF @@ERROR >0 RETURN -1
 
@@ -756,7 +764,7 @@ PRINT 'spProcessCallLegUpdate: Ending'
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spProcessCallStart]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spProcessCallStart]    Script Date: 02-Feb-22 13:15:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -783,8 +791,8 @@ OUTPUT INSERTED.intRawRecordID INTO @tblProcessed
 SELECT * FROM (
 
 select ID as intRawRecordID,
-	Records.col.value('@session','uniqueidentifier') as 'Session',
-	Records.col.value('@callBridge','uniqueidentifier') as CallBridge,
+	Record.col.value('../@session','uniqueidentifier') as 'Session',
+	Record.col.value('../@callBridge','uniqueidentifier') as CallBridge,
 	Record.col.value('(@time)[1]','varchar(64)') as dtTime,
 	Record.col.value('(@correlatorIndex)[1]','int') as intCorrelatorIndex,
 	Record.col.value('(call/@id)[1]','uniqueidentifier') as CallID,
@@ -797,7 +805,7 @@ select ID as intRawRecordID,
 from tblRawRecords
 
 OUTER APPLY tblRawRecords.xmlBody.nodes('records') as Records(col)
-OUTER APPLY tblRawRecords.xmlBody.nodes('records/record') as Record(col)
+OUTER APPLY Records.col.nodes('record') as Record(col)
 
 where not bitProcessed=1
 AND
@@ -806,9 +814,8 @@ Record.col.value('(@type)[1]','varchar(64)') = 'callStart'
 )
 as Garbage
 
-UPDATE tblRawRecords
-SET bitProcessed=1, dtProcessed=SYSDATETIME()
-WHERE tblRawRecords.ID in (SELECT intRawRecordID FROM @tblProcessed)
+SELECT intRawRecordID
+FROM @tblProcessed
 
 IF @@ERROR >0 RETURN -1
 
