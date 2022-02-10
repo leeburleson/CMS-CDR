@@ -830,7 +830,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [dbo].[spRemoveInvalidRawRecords]
+CREATE PROCEDURE [dbo].[spRemoveInvalidRawRecords]
 
 AS
 BEGIN
@@ -1106,7 +1106,7 @@ GO
 
 
 
-ALTER PROCEDURE [dbo].[spRpt_GetRecentMeetings]
+CREATE PROCEDURE [dbo].[spRpt_GetRecentMeetings]
 	@intDays int
 
 AS
