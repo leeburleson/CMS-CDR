@@ -1098,7 +1098,7 @@ ORDER BY intYYYYMM
 
 END
 GO
-/****** Object:  StoredProcedure [dbo].[spRpt_GetRecentMeetings]    Script Date: 08-Jul-21 14:42:46 ******/
+/****** Object:  StoredProcedure [dbo].[spRpt_GetRecentMeetings]    Script Date: 10-Feb-22 10:46:01 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -1106,7 +1106,7 @@ GO
 
 
 
-CREATE PROCEDURE [dbo].[spRpt_GetRecentMeetings]
+ALTER PROCEDURE [dbo].[spRpt_GetRecentMeetings]
 	@intDays int
 
 AS
@@ -1115,7 +1115,13 @@ BEGIN
 	-- interfering with SELECT statements.
 	SET NOCOUNT ON;
 
+SELECT COUNT(*) AS 'Total meetings', SUM(tblCallEnd.intDurationSeconds)/60/60 AS 'Total Room Hours'
+FROM tblCallEnd
+INNER JOIN
+tblCallStart ON tblCallEnd.CallID = tblCallStart.CallID
+WHERE  DATEDIFF(D,tblCallStart.dtTime,SYSDATETIME()) < @intDays
 
+---
 
 SELECT tblCallEnd.CallID as 'Call ID', 
 		tblCallStart.dtTime as 'Begin Date/Time', 
