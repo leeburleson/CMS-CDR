@@ -1017,6 +1017,7 @@ WHERE tblCallStart.CallID = @CallID
 -- Call leg (participants) table:
 SELECT DISTINCT 
 	DENSE_RANK() OVER (ORDER BY tblCallLegStart.dtTime) AS '#',
+	CASE WHEN tblCallLegEnd.vcTxVideoCodec IS NOT NULL THEN 1 ELSE 0 END AS '+Video',
 	tblCallLegStart.dtTime as 'Begin Date/Time',
 	tblCallLegEnd.dtTime as 'End Date/Time',
 	COALESCE(tblCallLegStart.vcDisplayName,tblCallLegUpdate.vcDisplayName) as 'Display Name',
