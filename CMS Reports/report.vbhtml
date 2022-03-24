@@ -77,17 +77,24 @@ End Code
                 For Each col In dt.Columns
                     If col.DataType.Name = "DateTime" Then
                         ' Format for UTC:
-                        cell = DateTime.SpecifyKind(row.Item(col.ColumnName), DateTimeKind.Utc).ToString("u")
+                        cell = "<td>" & DateTime.SpecifyKind(row.Item(col.ColumnName), DateTimeKind.Utc).ToString("u") & "</td>"
                     ElseIf col.ColumnName = "Call ID" Then
                         ' Add ability to click Call ID for a detail report:
-                        cell = "<a href=" & Chr(34) & "#" & Chr(34) & " onclick=" & Chr(34) & "CallID_onclick('" & row.Item(col.ColumnName).ToString & "')" & Chr(34) & ">" & row.Item(col.ColumnName).ToString & "</a>"
+                        cell = "<td><a href=" & Chr(34) & "#" & Chr(34) & " onclick=" & Chr(34) & "CallID_onclick('" & row.Item(col.ColumnName).ToString & "')" & Chr(34) & ">" & row.Item(col.ColumnName).ToString & "</a></td>"
+                    ElseIf col.ColumnName = "+Video" Then
+                        ' Add a video icon to call legs that were video-enabled:
+                        If row.Item(col.ColumnName) = 1 Then
+                            cell = "<td style=" & Chr(34) & "text-align:center;" & Chr(34) & ">" & "<img src=" & Chr(34) & "Content/Enable-Camera_2-512.webp" & Chr(34) & " width=" & Chr(34) & "30" & Chr(34) & "height=" & Chr(34) & "30" & Chr(34) & "></td>"
+                        Else
+                            cell = "<td />"
+                        End If
                     Else
-                        cell = row.Item(col.ColumnName).ToString
+                        cell = "<td>" & row.Item(col.ColumnName).ToString & "</td>"
                     End If
-            End code
-            <td>@Html.Raw(cell)</td>
-            @code
-                Next
+                    End code
+                    @Html.Raw(cell)
+                    @code
+                        Next
             end code
         </tr>
         @code
